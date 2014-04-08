@@ -1,7 +1,6 @@
 <?php
 namespace Saas\Devtracker\OAuth\Odesk;
 use Exception;
-use ReflectionClass;
 /**
  * !! IMPORTANT !!
  * This is just an example, it not well-formed library
@@ -88,7 +87,7 @@ final class oDeskAPI {
      * @return  boolean
      */
     public static function option($option, $value) {
-        $r = new ReflectionClass('\\'.__CLASS__);
+        $r = new \ReflectionClass('\\'.__CLASS__);
         try {
             $r->getProperty($option);
             self::$$option = $value;
@@ -124,6 +123,7 @@ final class oDeskAPI {
             $url = self::URL_RTOKEN . self::merge_params_to_uri(self::get_api_uri($api_sig), $params);
 
             $data = self::send_request($url, 'post');
+
             preg_match('~oauth_callback_confirmed=true&oauth_token=([\da-f]{32})&oauth_token_secret=([\da-f]{16})~', $data['response'], $match);
             self::$ot_token  = $match[1];
             self::$ot_secret = $match[2];
@@ -131,7 +131,9 @@ final class oDeskAPI {
     
             if (self::$mode === 'web') {
                 // authorize web application via browser
-                header('Location: ' . self::URL_AUTH . '?oauth_token=' . self::$ot_token); exit;
+                header('Location: ' . self::URL_AUTH . '?oauth_token=' . self::$ot_token);
+                exit;
+
             } else if (self::$mode === 'nonweb') {
                 // authorize nonweb application
                 // 2. login
@@ -240,7 +242,6 @@ final class oDeskAPI {
         ksort($_p);
         
         $api_sig = self::calc_api_sig(self::$api_secret, self::transcode_params($_params), $url, $method, false);
-       
         $url = $url . self::_merge_params_to_uri(self::get_api_uri($api_sig), $_p, ((self::$epoint == 'gds') ? true : false));
 
         $data = self::send_request($url, $type);
@@ -251,7 +252,6 @@ final class oDeskAPI {
             $d = print_r($data, true);
             throw new Exception('API does not return anything or request could not be finished. Response: '.(empty($t) ? '&lt;EMPTY&gt;' : $t));
         } else if ($data['info']['http_code'] != 200) {
-
             return $data['response']; // return non200 response, to be able test non-200 reply in public apis
             //throw new Exception('API return code - '.$data['info']['http_code'].'. Can not create '.strtoupper($type).' request.');
         } else {
@@ -293,6 +293,7 @@ final class oDeskAPI {
      * @return  mixed
      */
     static private function get_api_token($oauth_verifier = null) {
+        
         if (self::$api_token)
             return self::$api_token;
 
@@ -302,15 +303,15 @@ final class oDeskAPI {
         $params = self::get_params_for_request();
         $params += array(
                     'oauth_verifier'=> $oauth_verifier,
-                    'oauth_token'   => self::$ot_token
+                    'oauth_token'   => \Input::get('oauth_token')
                 );
         
-        ksort($params);
+
         $api_sig = self::calc_api_sig(self::$ot_secret, $params, self::URL_ATOKEN);
 
         $url = self::URL_ATOKEN . self::merge_params_to_uri(self::get_api_uri($api_sig), $params);
 
-        $data = self::send_request($url, 'post');
+        $data = self::send_request($url, 'post');   
         preg_match('~oauth_token=([\da-f]{32})&oauth_token_secret=([\da-f]{16})~', $data['response'], $match);
         if (!isset($data['info']['http_code'])) {
             throw new Exception('API does not return anything or request could not be finished.');
@@ -319,7 +320,8 @@ final class oDeskAPI {
         } else {
             self::$api_token  = $match[1];
             self::$api_secret = $match[2];
-            return self::$api_token;
+
+
         }
     }
 
@@ -333,6 +335,7 @@ final class oDeskAPI {
      * @return  array
      */
     static private function send_request($url, $type = 'get') {
+
         $ch = curl_init();
         if ($type != 'get')
             list($url, $pdata) = explode('?', $url, 2);
@@ -375,6 +378,7 @@ final class oDeskAPI {
             if (self::$amode == 'base' || is_int(strpos($url, self::URL_LOGIN)) || is_int(strpos($url, self::URL_AUTH)))
                 curl_setopt($ch, CURLOPT_POSTFIELDS, $pdata);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+
         }
         if (self::$proxy) {
             curl_setopt($ch, CURLOPT_HTTPPROXYTUNNEL, 1);
@@ -386,11 +390,13 @@ final class oDeskAPI {
         curl_setopt($ch, CURLOPT_URL, $url);
         !self::$debug || curl_setopt($ch, CURLINFO_HEADER_OUT, true); //debug
         $response = curl_exec($ch);
+
         !self::$debug || print(curl_getinfo($ch, CURLINFO_HEADER_OUT)); //debug
         !self::$debug || print_r($response);
         $data['response']= $response;
         $data['info']    = curl_getinfo($ch);
         $data['error']   = curl_error($ch);
+
         
         $header_size    = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
         $data['header'] = substr($response, 0, $header_size);
@@ -496,8 +502,8 @@ final class oDeskAPI {
 
     protected static function transcode($data) {
         return ($data === false)
-            ? $data
-            : self::encode(rawurldecode($data));
+                ? $data
+                : self::encode(rawurldecode($data));
     }
 
     static private function encode($data) {
@@ -549,6 +555,13 @@ final class oDeskAPI {
 
         return base64_encode(hash_hmac('sha1', $base_string, $secret_key, true));
     }
+    public function getToken($verifier)
+    {
+
+        return self::get_api_token($verifier);
+
+    }
+    
 }
 
 ?>
